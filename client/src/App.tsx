@@ -69,7 +69,10 @@ function App() {
   const currentPlayerDream = me?.dream ?? [];
   const opponentDream = opponent?.dream ?? [];
   const activeRoundResult = gameState?.roundResults ?? null;
+  
+  // Zmienne sterujące widocznością okien pop-up
   const isRoundResultsOverlayVisible = gameState?.turnPhase === 'ROUND_RESULTS';
+  const isGameOverOverlayVisible = gameState?.turnPhase === 'GAME_OVER';
 
   const joinRoom = () => {
     const roomCode = normalizeRoomCode(roomIdInput);
@@ -176,6 +179,12 @@ function App() {
     socket.emit('continueRound');
   };
 
+  const restartGame = () => {
+    // Prosty powrót do lobby poprzez odświeżenie okna. 
+    // Jeśli posiadasz na serwerze zdarzenie do resetu, użyj: socket.emit('restartGame');
+    window.location.reload();
+  };
+
   const toggleNestSlot = (slotIndex: number) => {
     setSelectedNestSlots((current) => {
       if (current.includes(slotIndex)) {
@@ -251,14 +260,12 @@ function App() {
         />
       </section>
 
+      {/* OKNO: KONIEC RUNDY */}
       {isRoundResultsOverlayVisible ? (
-        <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
+        <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="round-over-title">
           <div className="game-over-panel panel-card">
             <p className="eyebrow">Koniec rundy</p>
-            <h2 id="game-over-title">Wyniki rundy {gameState.roundNumber}</h2>
-            {/* <p className="game-over-summary">
-                Poniżej widać rozliczenie tej rundy i aktualny stan gry.
-            </p> */}
+            <h2 id="round-over-title">Wyniki rundy {gameState.roundNumber}</h2>
             <div className="game-over-results">
               {activeRoundResult?.map((result) => {
                 const player = gameState.players.find((entry) => entry.id === result.playerId);
@@ -287,6 +294,33 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      {/* OKNO: KONIEC GRY */}
+      {isGameOverOverlayVisible ? (
+        <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
+          <div className="game-over-panel panel-card">
+            <p className="eyebrow">Koniec gry</p>
+            <h2 id="game-over-title">Ostateczne wyniki</h2>
+            <div className="game-over-stats">
+              {gameState.players.map((player) => {
+                const isWinner = player.dragonTokens >= 3;
+                return (
+                  <div key={player.id} className={`game-over-stat ${isWinner ? 'winner' : ''}`}>
+                    <span>{player.isMe ? 'Ty' : 'Przeciwnik'} {isWinner && ' 🏆'}</span>
+                    <strong>{player.totalPoints} pkt · {player.dragonTokens} żetonów</strong>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="game-over-actions">
+              <button type="button" className="primary-button" onClick={restartGame}>
+                Wróć do lobby
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }
