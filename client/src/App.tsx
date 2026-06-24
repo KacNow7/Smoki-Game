@@ -5,7 +5,7 @@ import { LobbyScreen } from './components/LobbyScreen';
 import type { ClientGameState, DrawSource } from './gameTypes';
 import './App.css';
 
-const socket: Socket = io('http://192.168.33.12:3000');
+const socket: Socket = io('https://smoki-backend-1wyn.onrender.com');
 const roomCodePattern = /^[A-Z0-9]{4,8}$/;
 
 function normalizeRoomCode(input: string): string | null {
