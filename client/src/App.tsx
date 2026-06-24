@@ -302,15 +302,22 @@ function App() {
             <p className="eyebrow">Koniec gry</p>
             <h2 id="game-over-title">Ostateczne wyniki</h2>
             <div className="game-over-stats">
-              {gameState.players.map((player) => {
-                const isWinner = player.dragonTokens >= 3;
-                return (
-                  <div key={player.id} className={`game-over-stat ${isWinner ? 'winner' : ''}`}>
-                    <span>{player.isMe ? 'Ty' : 'Przeciwnik'} {isWinner && ' 🏆'}</span>
-                    <strong>{player.totalPoints} pkt · {player.dragonTokens} żetonów</strong>
-                  </div>
-                )
-              })}
+              {(() => {
+                // Szukamy najmniejszej liczby punktów spośród wszystkich graczy
+                const minPoints = Math.min(...gameState.players.map(p => p.totalPoints));
+                
+                return gameState.players.map((player) => {
+                  // Wygrywa ten, kogo punkty są równe najniższemu wynikowi (działa też przy remisie!)
+                  const isWinner = player.totalPoints === minPoints;
+                  
+                  return (
+                    <div key={player.id} className={`game-over-stat ${isWinner ? 'winner' : ''}`}>
+                      <span>{player.isMe ? 'Ty' : 'Przeciwnik'} {isWinner && ' 🏆'}</span>
+                      <strong>{player.totalPoints} pkt · {player.dragonTokens} żetonów</strong>
+                    </div>
+                  )
+                });
+              })()}
             </div>
             <div className="game-over-actions">
               <button type="button" className="primary-button" onClick={restartGame}>
@@ -320,7 +327,6 @@ function App() {
           </div>
         </div>
       ) : null}
-
     </div>
   );
 }
