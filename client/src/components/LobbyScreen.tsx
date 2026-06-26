@@ -28,6 +28,7 @@ export function LobbyScreen({
           {isConnected ? 'Połączono z serwerem' : 'Brak połączenia z serwerem'}
         </p>
         <h1>Smoki</h1>
+        <span className="lobby-subtitle">by Kacper Nowikiewicz</span>
         {lobbyMessage ? <p className="lobby-message">{lobbyMessage}</p> : null}
         {shareMessage ? <p className="lobby-message success">{shareMessage}</p> : null}
         <div className="join-form">

@@ -52,6 +52,16 @@
   color: #d7ffe5;
 }
 
+.lobby-subtitle {
+  display: block;
+  margin-bottom: 8px;
+  margin-left: 4px;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255, 255, 255);
+}
+
 .connection-pill {
   display: inline-flex;
   align-items: center;
@@ -96,6 +106,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  padding-top: 10px;
 }
 
 .join-row input {
