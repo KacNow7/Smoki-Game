@@ -33,6 +33,12 @@ const io = new Server(httpServer, {
 
 const rooms: Record<string, RoomState> = {};
 
+const OPEN_PILE_COUNT = 1;
+
+function createOpenPiles(): Card[][] {
+  return Array.from({ length: OPEN_PILE_COUNT }, () => [] as Card[]);
+}
+
 function recordMove(room: RoomState, message: string): void {
   room.moveHistory = [...room.moveHistory, message].slice(-8);
 }
@@ -60,7 +66,7 @@ function createRoom(roomId?: string): RoomState {
     id: finalRoomId,
     players: [],
     hiddenDeck: createDeck(),
-    openPiles: [[]],
+    openPiles: createOpenPiles(),
     currentTurnPlayerId: null,
     turnPhase: 'WAITING_FOR_PLAYERS',
     pendingDraw: null,
@@ -70,6 +76,7 @@ function createRoom(roomId?: string): RoomState {
     roundResults: null,
     gameWinnerPlayerId: null,
     scoringSubmissions: {},
+    continueRoundAcknowledgements: {},
     initialRevealSelections: {},
     statusMessage: 'Czekamy na drugiego gracza.',
     roundNumber: 0,
@@ -98,6 +105,10 @@ function broadcastRoomState(room: RoomState): void {
   room.players.forEach((player) => {
     io.to(player.id).emit('gameState', getFilteredGameState(room, player.id));
   });
+}
+
+function getContinueRoundAcceptedCount(room: RoomState): number {
+  return Object.keys(room.continueRoundAcknowledgements).length;
 }
 
 function getCurrentPlayer(room: RoomState) {
@@ -245,6 +256,7 @@ function maybeEnterScoring(room: RoomState): void {
 function resetRoundSelections(room: RoomState): void {
   room.initialRevealSelections = {};
   room.scoringSubmissions = {};
+  room.continueRoundAcknowledgements = {};
 }
 
 function finalizeScoringIfReady(room: RoomState): void {
@@ -355,14 +367,21 @@ io.on('connection', (socket) => {
     broadcastRoomState(room);
   });
 
-  socket.on('discardPendingDraw', ({ openPileIndex }: { openPileIndex: number }) => {
+  socket.on('discardPendingDraw', ({ openPileIndex }: { openPileIndex?: number }) => {
     const room = getRoomForSocket(socket);
     if (!room || room.currentTurnPlayerId !== socket.id || room.turnPhase !== 'CHOOSE_KEEP_OR_DISCARD' || !room.pendingDraw) {
       return;
     }
 
-    discardCardToOpenPile(room, room.pendingDraw.card, 0);
-    recordMove(room, 'Odrzucono dobraną kartę na stos odkryty.');
+    if (room.pendingDraw.card.kind === 'CIRCLE') {
+      room.statusMessage = 'Kruczy krąg trzeba zagrać do snu, nie można go odłożyć na stos odkryty.';
+      broadcastRoomState(room);
+      return;
+    }
+
+    const targetPileIndex = openPileIndex ?? 0;
+    discardCardToOpenPile(room, room.pendingDraw.card, targetPileIndex);
+    recordMove(room, `Odrzucono dobraną kartę na stos odkryty ${targetPileIndex + 1}.`);
     room.pendingDraw = null;
     room.turnPhase = 'CHOOSE_DRAW_SOURCE';
     advanceTurn(room);
@@ -540,10 +559,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.turnPhase === 'ROUND_RESULTS' && room.roundEnderPlayerId !== socket.id && room.nextStartingPlayerId !== socket.id) {
-      return;
-    }
-
     if (room.turnPhase === 'GAME_OVER') {
       room.players.forEach((player) => {
         player.dragonTokens = 0;
@@ -554,9 +569,25 @@ io.on('connection', (socket) => {
       room.roundResults = null;
       room.roundEnderPlayerId = null;
       room.nextStartingPlayerId = null;
+      room.continueRoundAcknowledgements = {};
       room.statusMessage = 'Rozpoczyna się nowa gra.';
       startNewRound(room, room.players[0]?.id);
       recordMove(room, 'Rozpoczęto nową grę po zakończeniu poprzedniej.');
+      broadcastRoomState(room);
+      return;
+    }
+
+    const player = getPlayer(room, socket.id);
+    if (!player) {
+      return;
+    }
+
+    room.continueRoundAcknowledgements[socket.id] = true;
+    const acceptedCount = getContinueRoundAcceptedCount(room);
+
+    if (acceptedCount < room.players.length) {
+      room.statusMessage = `Oczekiwanie na drugiego gracza (${acceptedCount}/${room.players.length}).`;
+      recordMove(room, `${player.id} potwierdził gotowość do następnej rundy (${acceptedCount}/${room.players.length}).`);
       broadcastRoomState(room);
       return;
     }

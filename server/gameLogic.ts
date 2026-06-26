@@ -72,10 +72,10 @@ export function replenishDeckFromDiscard(room: RoomState): void {
   room.hiddenDeck = shuffleDeck(collectedCards.map((card) => ({ ...card, isFaceUp: false })));
   room.openPiles = [[]];
 
-  const firstOpen = room.hiddenDeck.pop();
-  if (firstOpen) {
-    firstOpen.isFaceUp = true;
-    room.openPiles[0] = [firstOpen];
+  const nextOpen = room.hiddenDeck.pop();
+  if (nextOpen) {
+    nextOpen.isFaceUp = true;
+    room.openPiles[0] = [nextOpen];
   }
 }
 
@@ -91,6 +91,7 @@ export function startNewRound(room: RoomState, startingPlayerId?: string): void 
   room.roundEnderPlayerId = null;
   room.roundResults = null;
   room.scoringSubmissions = {};
+  room.continueRoundAcknowledgements = {};
   room.initialRevealSelections = {};
   room.gameWinnerPlayerId = null;
   room.turnPhase = room.players.length < 2 ? 'WAITING_FOR_PLAYERS' : 'CHOOSE_INITIAL_REVEAL';
@@ -299,6 +300,68 @@ export function calculateRoundResults(room: RoomState): RoundResult[] {
   });
 }
 
+function getLiveRoundPoints(room: RoomState, player: Player): number {
+  const scoringSubmission = room.scoringSubmissions[player.id];
+  const submission = scoringSubmission ?? { choices: buildAutoMirrorChoices(room, player) };
+  
+  // Calculate score only from face-up cards during gameplay
+  const faceUpCards = player.dream.filter((card) => card.isFaceUp);
+  if (faceUpCards.length === 0) {
+    return 0;
+  }
+  
+  // Build a temporary dream array with only face-up cards, zero for hidden cards
+  const tempDream = player.dream.map((card) => (card.isFaceUp ? card : { ...card, value: 0 }));
+  
+  // Calculate effective values for the temp dream
+  const effectiveValues = tempDream.map((card, index) => {
+    if (card.kind !== 'MIRROR' || !card.isFaceUp) {
+      return card.value;
+    }
+    
+    const direction = submission?.choices[index] ?? inferMirrorDirection(tempDream, index);
+    const neighborIndex = direction === 'LEFT' ? index - 1 : index + 1;
+    const neighbor = tempDream[neighborIndex];
+    
+    if (!neighbor || !neighbor.isFaceUp) {
+      return 0;
+    }
+    
+    if (neighbor.kind === 'MIRROR') {
+      return getMirrorValue(tempDream, neighborIndex, submission, new Set([index]));
+    }
+    
+    return neighbor.value;
+  });
+  
+  // Apply zero-out logic for matching columns
+  const zeroed = new Set<number>();
+  for (let column = 0; column < 3; column += 1) {
+    const topIndex = column;
+    const bottomIndex = column + 3;
+    const topCard = tempDream[topIndex];
+    const bottomCard = tempDream[bottomIndex];
+    
+    if (!topCard?.isFaceUp || !bottomCard?.isFaceUp) {
+      continue;
+    }
+    
+    const topValue = effectiveValues[topIndex];
+    const bottomValue = effectiveValues[bottomIndex];
+    
+    if (topValue === bottomValue) {
+      if (topCard.kind !== 'MIRROR') {
+        zeroed.add(topIndex);
+      }
+      if (bottomCard.kind !== 'MIRROR') {
+        zeroed.add(bottomIndex);
+      }
+    }
+  }
+  
+  return effectiveValues.reduce((sum, value, index) => sum + (zeroed.has(index) ? 0 : value), 0);
+}
+
 export function revealAllDreams(room: RoomState): void {
   room.players.forEach((player) => {
     player.dream.forEach((card) => {
@@ -353,6 +416,7 @@ export function setRoundResults(room: RoomState): RoundResult[] {
     : winners.length > 1
       ? 'Remis w rundzie. Remisujący gracze otrzymują żeton smoka.'
       : 'Runda zakończona. Zwycięzca bierze żeton smoka.';
+  room.continueRoundAcknowledgements = {};
 
   return room.roundResults;
 }
@@ -379,6 +443,7 @@ export function getFilteredGameState(room: RoomState, targetPlayerId: string): C
     roundEnderPlayerId: room.roundEnderPlayerId,
     roundResults: room.roundResults,
     gameWinnerPlayerId: room.gameWinnerPlayerId,
+    continueRoundAcknowledgements: room.continueRoundAcknowledgements,
     roundNumber: room.roundNumber,
     statusMessage: room.statusMessage,
     initialRevealSelections: room.initialRevealSelections,
@@ -388,7 +453,7 @@ export function getFilteredGameState(room: RoomState, targetPlayerId: string): C
       isMe: p.id === targetPlayerId,
       dragonTokens: p.dragonTokens,
       totalPoints: p.totalPoints,
-      roundPoints: p.roundPoints,
+      roundPoints: room.turnPhase === 'ROUND_RESULTS' || room.turnPhase === 'GAME_OVER' ? p.roundPoints : getLiveRoundPoints(room, p),
       dream: p.dream.map((card) => {
         if (card.isFaceUp) {
           return { id: card.id, isFaceUp: card.isFaceUp, kind: card.kind, value: card.value };

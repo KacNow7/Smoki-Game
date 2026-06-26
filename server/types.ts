@@ -59,6 +59,7 @@ export interface RoomState {
     roundResults: RoundResult[] | null;
     gameWinnerPlayerId: string | null;
     scoringSubmissions: Record<string, ScoringSubmission>;
+    continueRoundAcknowledgements: Record<string, true>;
     initialRevealSelections: Record<string, number>;
     statusMessage: string;
     roundNumber: number;
@@ -83,6 +84,7 @@ export interface ClientGameState {
     roundEnderPlayerId: string | null;
     roundResults: RoundResult[] | null;
     gameWinnerPlayerId: string | null;
+    continueRoundAcknowledgements: Record<string, true>;
     roundNumber: number;
     statusMessage: string;
     initialRevealSelections: Record<string, number>;

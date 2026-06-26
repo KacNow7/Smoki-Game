@@ -14,10 +14,11 @@ function CenterStacksBase({ gameState, isMyTurn, onDrawCard, onDiscardCard }: Ce
   const currentTurnPhase = gameState.turnPhase;
   const hiddenDeckCard = useMemo(() => createHiddenDeckCard(gameState.hiddenDeckCount), [gameState.hiddenDeckCount]);
   const topOpenCard = gameState.openPiles[0]?.[gameState.openPiles[0].length - 1] ?? null;
-  const canDraw = isMyTurn && currentTurnPhase === 'CHOOSE_DRAW_SOURCE';
-  const canDiscard = isMyTurn && currentTurnPhase === 'CHOOSE_KEEP_OR_DISCARD';
   const drawnCard = gameState.pendingDraw ?? null;
   const drawnSource = gameState.pendingDraw?.source ?? null;
+  const canDraw = isMyTurn && currentTurnPhase === 'CHOOSE_DRAW_SOURCE';
+  const canDiscard = isMyTurn && currentTurnPhase === 'CHOOSE_KEEP_OR_DISCARD' && drawnCard?.kind !== 'CIRCLE';
+  const mustKeepCircle = drawnCard?.kind === 'CIRCLE';
 
   return (
     <section className="center-stacks panel-card">
@@ -28,7 +29,6 @@ function CenterStacksBase({ gameState, isMyTurn, onDrawCard, onDiscardCard }: Ce
               <PlayingCard card={drawnCard} />
             </div>
           ) : null}
-            {/* <p className="stack-title">Stos odkryty</p> */}
           <button
             type="button"
             className="pile-button"
@@ -70,6 +70,7 @@ function CenterStacksBase({ gameState, isMyTurn, onDrawCard, onDiscardCard }: Ce
           </button>
         </div>
       </div>
+      {mustKeepCircle ? <p className="turn-state active">Kruczy krąg musisz zagrać do snu.</p> : null}
     </section>
   );
 }

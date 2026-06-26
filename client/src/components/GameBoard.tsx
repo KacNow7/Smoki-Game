@@ -190,9 +190,11 @@ function GameBoardBase({
       <section className="opponent-zone">
         <div className="zone-heading">
           <h3>Przeciwnik</h3>
-          <span>
-            {opponent?.dragonTokens ?? 0} żetonów · {opponent?.totalPoints ?? 0} pkt
-          </span>
+          <div className="zone-stats">
+            <span>żetony: {opponent?.dragonTokens ?? 0}</span>
+            <span>pkt: {opponent?.totalPoints ?? 0}</span>
+            <span>pkt w rundzie: {opponent?.roundPoints ?? 0}</span>
+          </div>
         </div>
         <div className="dream-grid opponent opponent-view">{opponentDreamGrid}</div>
       </section>
@@ -208,9 +210,11 @@ function GameBoardBase({
       <section className="player-zone">
         <div className="zone-heading">
           <h3>Twój sen</h3>
-          <span>
-            {me?.dragonTokens ?? 0} żetonów · {me?.totalPoints ?? 0} pkt
-          </span>
+          <div className="zone-stats">
+            <span>żetony: {me?.dragonTokens ?? 0}</span>
+            <span>pkt: {me?.totalPoints ?? 0}</span>
+            <span>pkt w rundzie: {me?.roundPoints ?? 0}</span>
+          </div>
         </div>
         <div className="dream-grid own">{playerDreamGrid}</div>
         {currentTurnPhase === 'CHOOSE_NEST_SWAP' && isMyTurn ? (

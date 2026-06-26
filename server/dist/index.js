@@ -4,14 +4,18 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { randomBytes } from 'crypto';
 import {} from './types.js';
-import { createDeck, getFilteredGameState, initializeRoomIfReady, isDreamComplete, prepareNextRound, revealAllDreams, replenishDeckFromDiscard, setRoundResults, startNewRound, } from './gameLogic.js';
+import { createDeck, buildAutoMirrorChoices, getFilteredGameState, initializeRoomIfReady, isDreamComplete, prepareNextRound, revealAllDreams, replenishDeckFromDiscard, setRoundResults, startNewRound, } from './gameLogic.js';
 const app = express();
 app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-    cors: { origin: 'http://localhost:5173', methods: ['GET', 'POST'] },
+    cors: { origin: '*', methods: ['GET', 'POST'] },
 });
 const rooms = {};
+const OPEN_PILE_COUNT = 1;
+function createOpenPiles() {
+    return Array.from({ length: OPEN_PILE_COUNT }, () => []);
+}
 function recordMove(room, message) {
     room.moveHistory = [...room.moveHistory, message].slice(-8);
 }
@@ -33,7 +37,7 @@ function createRoom(roomId) {
         id: finalRoomId,
         players: [],
         hiddenDeck: createDeck(),
-        openPiles: [[]],
+        openPiles: createOpenPiles(),
         currentTurnPlayerId: null,
         turnPhase: 'WAITING_FOR_PLAYERS',
         pendingDraw: null,
@@ -176,9 +180,15 @@ function maybeEnterScoring(room) {
     room.pendingNestSlot = null;
     room.currentTurnPlayerId = null;
     room.turnPhase = 'ROUND_SCORING';
-    room.statusMessage = 'Runda zakończona. Odkryj pozostałe karty i wybierz kierunki Odbić w wodzie.';
+    room.statusMessage = 'Runda zakończona. Punktowanie przebiega automatycznie.';
     revealAllDreams(room);
     recordMove(room, `Runda ${room.roundNumber}: zaczęto rozstrzyganie punktów.`);
+    room.players.forEach((player) => {
+        room.scoringSubmissions[player.id] = {
+            choices: buildAutoMirrorChoices(room, player),
+        };
+    });
+    finalizeScoringIfReady(room);
 }
 function resetRoundSelections(room) {
     room.initialRevealSelections = {};
@@ -283,8 +293,14 @@ io.on('connection', (socket) => {
         if (!room || room.currentTurnPlayerId !== socket.id || room.turnPhase !== 'CHOOSE_KEEP_OR_DISCARD' || !room.pendingDraw) {
             return;
         }
-        discardCardToOpenPile(room, room.pendingDraw.card, 0);
-        recordMove(room, 'Odrzucono dobraną kartę na stos odkryty.');
+        if (room.pendingDraw.card.kind === 'CIRCLE') {
+            room.statusMessage = 'Kruczy krąg trzeba zagrać do snu, nie można go odłożyć na stos odkryty.';
+            broadcastRoomState(room);
+            return;
+        }
+        const targetPileIndex = openPileIndex ?? 0;
+        discardCardToOpenPile(room, room.pendingDraw.card, targetPileIndex);
+        recordMove(room, `Odrzucono dobraną kartę na stos odkryty ${targetPileIndex + 1}.`);
         room.pendingDraw = null;
         room.turnPhase = 'CHOOSE_DRAW_SOURCE';
         advanceTurn(room);
@@ -429,7 +445,24 @@ io.on('connection', (socket) => {
     });
     socket.on('continueRound', () => {
         const room = getRoomForSocket(socket);
-        if (!room || room.turnPhase !== 'ROUND_RESULTS') {
+        if (!room || (room.turnPhase !== 'ROUND_RESULTS' && room.turnPhase !== 'GAME_OVER')) {
+            return;
+        }
+        if (room.turnPhase === 'GAME_OVER') {
+            room.players.forEach((player) => {
+                player.dragonTokens = 0;
+                player.totalPoints = 0;
+                player.roundPoints = 0;
+            });
+            room.gameWinnerPlayerId = null;
+            room.roundResults = null;
+            room.roundEnderPlayerId = null;
+            room.nextStartingPlayerId = null;
+            room.continueRoundAcknowledgements = {};
+            room.statusMessage = 'Rozpoczyna się nowa gra.';
+            startNewRound(room, room.players[0]?.id);
+            recordMove(room, 'Rozpoczęto nową grę po zakończeniu poprzedniej.');
+            broadcastRoomState(room);
             return;
         }
         const player = getPlayer(room, socket.id);
@@ -470,5 +503,5 @@ io.on('connection', (socket) => {
     });
 });
 const PORT = 3000;
-httpServer.listen(PORT, () => console.log(`🚀 Serwer działa na porcie ${PORT}`));
+httpServer.listen(PORT, () => console.log(`Serwer działa na porcie ${PORT}`));
 //# sourceMappingURL=index.js.map

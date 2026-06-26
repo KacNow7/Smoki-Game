@@ -5,7 +5,8 @@ import { LobbyScreen } from './components/LobbyScreen';
 import type { ClientGameState, DrawSource } from './gameTypes';
 import './App.css';
 
-const socket: Socket = io('https://smoki-backend-1wyn.onrender.com');
+const VITE_SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const socket: Socket = io(VITE_SOCKET_URL);
 const roomCodePattern = /^[A-Z0-9]{4,8}$/;
 
 function normalizeRoomCode(input: string): string | null {
@@ -69,6 +70,10 @@ function App() {
   const currentPlayerDream = me?.dream ?? [];
   const opponentDream = opponent?.dream ?? [];
   const activeRoundResult = gameState?.roundResults ?? null;
+  const continueRoundAcknowledgements = gameState?.continueRoundAcknowledgements ?? {};
+  const continueRoundAcceptedCount = Object.keys(continueRoundAcknowledgements).length;
+  const continueRoundTotalCount = gameState?.players.length ?? 0;
+  const meAcceptedContinue = me ? Boolean(continueRoundAcknowledgements[me.id]) : false;
   
   // Zmienne sterujące widocznością okien pop-up
   const isRoundResultsOverlayVisible = gameState?.turnPhase === 'ROUND_RESULTS';
@@ -287,9 +292,14 @@ function App() {
               ))}
             </div>
             <div className="game-over-actions">
-              <button type="button" className="primary-button" onClick={continueRound}>
-                Następna runda
-              </button>
+              <div className="pending-actions">
+                <button type="button" className="primary-button" onClick={continueRound} disabled={meAcceptedContinue}>
+                  {meAcceptedContinue ? 'Czekasz na drugiego gracza' : 'Następna runda'}
+                </button>
+                <span className="badge">
+                  Potwierdziło {continueRoundAcceptedCount}/{continueRoundTotalCount || 2} graczy
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -303,11 +313,10 @@ function App() {
             <h2 id="game-over-title">Ostateczne wyniki</h2>
             <div className="game-over-stats">
               {(() => {
-                // Szukamy najmniejszej liczby punktów spośród wszystkich graczy
                 const minPoints = Math.min(...gameState.players.map(p => p.totalPoints));
                 
                 return gameState.players.map((player) => {
-                  // Wygrywa ten, kogo punkty są równe najniższemu wynikowi (działa też przy remisie!)
+                  // Wygrywa ten, kogo punkty są równe najniższemu wynikowi (działa też przy remisie)
                   const isWinner = player.totalPoints === minPoints;
                   
                   return (

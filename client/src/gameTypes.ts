@@ -54,6 +54,7 @@ export type ClientGameState = {
   roundEnderPlayerId: string | null;
   roundResults: RoundResult[] | null;
   gameWinnerPlayerId: string | null;
+  continueRoundAcknowledgements: Record<string, true>;
   roundNumber: number;
   statusMessage: string;
   initialRevealSelections: Record<string, number>;

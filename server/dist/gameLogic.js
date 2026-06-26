@@ -57,10 +57,10 @@ export function replenishDeckFromDiscard(room) {
     }
     room.hiddenDeck = shuffleDeck(collectedCards.map((card) => ({ ...card, isFaceUp: false })));
     room.openPiles = [[]];
-    const firstOpen = room.hiddenDeck.pop();
-    if (firstOpen) {
-        firstOpen.isFaceUp = true;
-        room.openPiles[0] = [firstOpen];
+    const nextOpen = room.hiddenDeck.pop();
+    if (nextOpen) {
+        nextOpen.isFaceUp = true;
+        room.openPiles[0] = [nextOpen];
     }
 }
 function dealDream(player, deck) {
@@ -135,6 +135,35 @@ function getPlayerScore(room, player, choices) {
         }
     }
     return effectiveValues.reduce((sum, value, index) => sum + (zeroed.has(index) ? 0 : value), 0);
+}
+export function buildAutoMirrorChoices(room, player) {
+    const mirrorSlots = player.dream
+        .map((card, index) => (card.kind === 'MIRROR' ? index : null))
+        .filter((index) => index !== null);
+    if (mirrorSlots.length === 0) {
+        return {};
+    }
+    let bestScore = Number.POSITIVE_INFINITY;
+    let bestChoices = {};
+    const currentChoices = {};
+    const evaluate = (slotOffset) => {
+        if (slotOffset >= mirrorSlots.length) {
+            const score = getPlayerScore(room, player, { choices: { ...currentChoices } });
+            if (score < bestScore) {
+                bestScore = score;
+                bestChoices = { ...currentChoices };
+            }
+            return;
+        }
+        const slotIndex = mirrorSlots[slotOffset];
+        currentChoices[slotIndex] = 'LEFT';
+        evaluate(slotOffset + 1);
+        currentChoices[slotIndex] = 'RIGHT';
+        evaluate(slotOffset + 1);
+        delete currentChoices[slotIndex];
+    };
+    evaluate(0);
+    return bestChoices;
 }
 function inferMirrorDirection(dream, slotIndex) {
     const rowStart = slotIndex < 3 ? 0 : 3;
