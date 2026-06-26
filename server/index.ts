@@ -559,7 +559,22 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const player = getPlayer(room, socket.id);
+    if (!player) {
+      return;
+    }
+
+    room.continueRoundAcknowledgements[socket.id] = true;
+    const acceptedCount = getContinueRoundAcceptedCount(room);
+
     if (room.turnPhase === 'GAME_OVER') {
+      if (acceptedCount < room.players.length) {
+        room.statusMessage = `Oczekiwanie na drugiego gracza (${acceptedCount}/${room.players.length}).`;
+        recordMove(room, `${player.id} potwierdził gotowość do nowej gry (${acceptedCount}/${room.players.length}).`);
+        broadcastRoomState(room);
+        return;
+      }
+
       room.players.forEach((player) => {
         player.dragonTokens = 0;
         player.totalPoints = 0;
@@ -576,14 +591,6 @@ io.on('connection', (socket) => {
       broadcastRoomState(room);
       return;
     }
-
-    const player = getPlayer(room, socket.id);
-    if (!player) {
-      return;
-    }
-
-    room.continueRoundAcknowledgements[socket.id] = true;
-    const acceptedCount = getContinueRoundAcceptedCount(room);
 
     if (acceptedCount < room.players.length) {
       room.statusMessage = `Oczekiwanie na drugiego gracza (${acceptedCount}/${room.players.length}).`;

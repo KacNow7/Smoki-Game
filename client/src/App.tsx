@@ -184,9 +184,7 @@ function App() {
     socket.emit('continueRound');
   };
 
-  const restartGame = () => {
-    // Prosty powrót do lobby poprzez odświeżenie okna. 
-    // Jeśli posiadasz na serwerze zdarzenie do resetu, użyj: socket.emit('restartGame');
+  const returnToLobby = () => {
     window.location.reload();
   };
 
@@ -329,9 +327,17 @@ function App() {
               })()}
             </div>
             <div className="game-over-actions">
-              <button type="button" className="primary-button" onClick={restartGame}>
-                Wróć do lobby
-              </button>
+              <div className="pending-actions">
+                <button type="button" className="primary-button" onClick={continueRound} disabled={meAcceptedContinue}>
+                  {meAcceptedContinue ? 'Czekasz na drugiego gracza' : 'Nowa gra'}
+                </button>
+                <button type="button" className="secondary-button" onClick={returnToLobby}>
+                  Wróć do lobby
+                </button>
+                <span className="badge">
+                  Potwierdziło {continueRoundAcceptedCount}/{continueRoundTotalCount || 2} graczy
+                </span>
+              </div>
             </div>
           </div>
         </div>
